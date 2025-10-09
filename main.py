@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 import httpx
 from urllib.parse import quote
 
@@ -12,8 +12,7 @@ async def root():
             "status_code": 400,
             "message": "The prompt parameter is required to generate the image",
             "developer": "El Impaciente",
-            "telegram_channel": "https://t.me/Apisimpacientes",
-            "usage": "Use /generate?prompt=your_description"
+            "telegram_channel": "https://t.me/Apisimpacientes"
         },
         status_code=400
     )
@@ -27,8 +26,7 @@ async def generate_image(prompt: str = ""):
                 "status_code": 400,
                 "message": "The prompt parameter is required to generate the image",
                 "developer": "El Impaciente",
-                "telegram_channel": "https://t.me/Apisimpacientes",
-                "example": "/generate?prompt=a beautiful sunset over mountains"
+                "telegram_channel": "https://t.me/Apisimpacientes"
             },
             status_code=400
         )
@@ -45,9 +43,9 @@ async def generate_image(prompt: str = ""):
         # Build Pollinations URL
         image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model={model}&width={width}&height={height}&nologo=true"
         
-        # Verify that URL works
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.head(image_url)
+        # Download the image
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(image_url)
             
             if response.status_code != 200:
                 return JSONResponse(
@@ -59,21 +57,16 @@ async def generate_image(prompt: str = ""):
                     },
                     status_code=400
                 )
-        
-        # Return successful response
-        return JSONResponse(
-            content={
-                "status_code": 200,
-                "message": "Image generated successfully",
-                "image_url": image_url,
-                "prompt": prompt,
-                "model": model,
-                "resolution": f"{width}x{height}",
-                "developer": "El Impaciente",
-                "telegram_channel": "https://t.me/Apisimpacientes"
-            },
-            status_code=200
-        )
+            
+            # Return the image directly
+            from fastapi.responses import Response
+            return Response(
+                content=response.content,
+                media_type="image/png",
+                headers={
+                    "Content-Disposition": "inline; filename=generated_image.png"
+                }
+            )
         
     except httpx.TimeoutException:
         return JSONResponse(
